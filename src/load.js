@@ -29,89 +29,16 @@
         LOADING    = 3,
         LOADED     = 4;
 
-    // Method 1: simply load and let browser take care of ordering
-    if (isAsync) {
-        api.load = function () {
-            ///<summary>
-            /// INFO: use cases
-            ///    head.load("http://domain.com/file.js","http://domain.com/file.js", callBack)
-            ///    head.load({ label1: "http://domain.com/file.js" }, { label2: "http://domain.com/file.js" }, callBack)
-            ///</summary> 
-            var args      = arguments,
-                 callback = args[args.length - 1],
-                 items    = {};
+    api.isAsync = function () {
+        return isAsync;
+    };
 
-            if (!isFunction(callback)) {
-                callback = null;
-            }
-            
-            if (isArray(args[0])) {
-                args[0].push(callback);
-                api.load.apply(null, args[0]);
-                
-                return api;
-            }
-
-            each(args, function (item, i) {
-                if (item !== callback) {
-                    item             = getAsset(item);
-                    items[item.name] = item;
-
-                    load(item, callback && (item.async || i === args.length - 2) ? function () {
-                        if (allLoaded(items)) {
-                            one(callback);
-                        }
-
-                    } : null);
-                }
-            });
-
-            return api;
-        };
-
-
-    // Method 2: preload with text/cache hack
-    } else {
-        api.load = function () {
-            var args = arguments,
-                rest = [].slice.call(args, 1),
-                next = rest[0];
-
-            // wait for a while. immediate execution causes some browsers to ignore caching
-            if (!isHeadReady) {
-                queue.push(function () {
-                    api.load.apply(null, args);
-                });
-
-                return api;
-            }
-            
-            // multiple arguments
-            if (!!next) {
-                /* Preload with text/cache hack (not good!)
-                 * http://blog.getify.com/on-script-loaders/
-                 * http://www.nczonline.net/blog/2010/12/21/thoughts-on-script-loaders/
-                 * If caching is not configured correctly on the server, then items could load twice !
-                 *************************************************************************************/
-                each(rest, function (item) {
-                    if (!isFunction(item) && !!item) {
-                        preLoad(getAsset(item));
-                    }
-                });
-                
-                // execute
-                load(getAsset(args[0]), isFunction(next) ? next : function () {
-                    api.load.apply(null, rest);
-                });                
-            }
-            else {
-                // single item
-                load(getAsset(args[0]));
-            }
-
-            return api;
-        };
-    }
+    api.load = function() {
+        if (api.isAsync())
+            return loadAsync.apply(null, arguments);
+        else
+            return loadSync.apply(null, arguments);
+    };
 
     // INFO: for retro compatibility
     api.js = api.load;
@@ -384,6 +311,86 @@
                 onPreload(asset);
             });
         }
+    }
+
+    // Method 1: simply load and let browser take care of ordering
+    function loadAsync() {
+        ///<summary>
+        /// INFO: use cases
+        ///    head.load("http://domain.com/file.js","http://domain.com/file.js", callBack)
+        ///    head.load({ label1: "http://domain.com/file.js" }, { label2: "http://domain.com/file.js" }, callBack)
+        ///</summary>
+        var args     = arguments,
+            callback = args[args.length - 1],
+            items    = {};
+
+        if (!isFunction(callback)) {
+            callback = null;
+        }
+
+        if (isArray(args[0])) {
+            args[0].push(callback);
+            api.load.apply(null, args[0]);
+
+            return api;
+        }
+
+        each(args, function (item, i) {
+            if (item !== callback) {
+                item             = getAsset(item);
+                items[item.name] = item;
+
+                load(item, callback && (item.async || i === args.length - 2) ? function () {
+                    if (allLoaded(items)) {
+                        one(callback);
+                    }
+
+                } : null);
+            }
+        });
+
+        return api;
+    }
+
+    // Method 2: preload with text/cache hack
+    function loadSync() {
+        var args = arguments,
+            rest = [].slice.call(args, 1),
+            next = rest[0];
+
+        // wait for a while. immediate execution causes some browsers to ignore caching
+        if (!isHeadReady) {
+            queue.push(function () {
+                api.load.apply(null, args);
+            });
+
+            return api;
+        }
+
+        // multiple arguments
+        if (!!next) {
+            /* Preload with text/cache hack (not good!)
+             * http://blog.getify.com/on-script-loaders/
+             * http://www.nczonline.net/blog/2010/12/21/thoughts-on-script-loaders/
+             * If caching is not configured correctly on the server, then items could load twice !
+             *************************************************************************************/
+            each(rest, function (item) {
+                if (!isFunction(item) && !!item) {
+                    preLoad(getAsset(item));
+                }
+            });
+
+            // execute
+            load(getAsset(args[0]), isFunction(next) ? next : function () {
+                api.load.apply(null, rest);
+            });
+        }
+        else {
+            // single item
+            load(getAsset(args[0]));
+        }
+
+        return api;
     }
 
     function load(asset, callback) {
