@@ -361,7 +361,7 @@
         // wait for a while. immediate execution causes some browsers to ignore caching
         if (!isHeadReady) {
             queue.push(function () {
-                api.load.apply(null, args);
+                loadSync.apply(null, args);
             });
 
             return api;
@@ -382,7 +382,7 @@
 
             // execute
             load(getAsset(args[0]), isFunction(next) ? next : function () {
-                api.load.apply(null, rest);
+                loadSync.apply(null, rest);
             });
         }
         else {
